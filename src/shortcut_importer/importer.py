@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import functools
 import logging
 import os
 import shelve
@@ -18,11 +19,24 @@ class Importer:
         self.gz = GitHubZenHub(github_config=config["github"], zenhub_config=config["zenhub"])
         self.sc = EasyShortcut(token=config["shortcut"]["token"])
         self.migrated = shelve.open(config["migrated_filename"])
+        self.strict = True
+
+    @functools.lru_cache(maxsize=1000)
+    def _map_username(self, github_username):
+        try:
+            return self.config["github_shortcut_user_map"][github_username]
+        except KeyError:
+            if not self.strict:
+                _logger.warning("GitHub user %s is unmapped" % (github_username,))
+                return None
+            raise
 
     def migrate_repo(self, repo_name):
         for issue in self.gz.fetch_issues(self.github_org, repo_name):
             issue_abbr = f"{issue.repository.organization.login}/{repo_name}#{issue.number}"
             is_epic = any(l for l in issue.labels if l.name == "Epic")
+            if issue.user.login == "reece":
+                continue
             if issue.html_url in self.migrated:
                 _logger.debug("Skipping %s; already migrated to %s" % (issue.html_url, self.migrated[issue.html_url]))
                 continue
@@ -46,22 +60,19 @@ class Importer:
                 issue.title,
             )
         )
-
-        assignees = [a.login for a in issue.assignees]
-        original_comment = f"Migrated from GitHub [{self.github_org}/{repo_name}#{issue.number}]({issue.html_url})"
         
         # todo: repo -> project
-        # todo: labels
         # todo: closed_at?
         # todo: closed_by?
-        # requested_by_id=self.config["github_shortcut_user_map"].get(issue.user.login),
         
+        original_comment = f"Migrated from GitHub [{self.github_org}/{repo_name}#{issue.number}]({issue.html_url})"
         body = dict(
             name=issue.title,
-            description=original_comment + "\n\n---\n\n" + issue.body,
+            description=original_comment + "\n\n---\n\n" + (issue.body or ""),
             created_at=issue.created_at,
-            owners=[self.config["github_shortcut_user_map"][a] for a in assignees],
+            owners=list(filter(None, [self._map_username(a.login) for a in issue.assignees])),
             external_id=issue.html_url,
+            requested_by=self._map_username(issue.user.login),
         )
 
         if is_epic:
@@ -70,7 +81,7 @@ class Importer:
             for c in issue.get_comments():
                 self.sc.create_epic_comment(
                     epic["id"],
-                    author=self.config["github_shortcut_user_map"][c.user.login],
+                    author=self._map_username(c.user.login),
                     created_at=c.created_at,
                     text=c.body,
                 )
@@ -82,7 +93,7 @@ class Importer:
             for c in issue.get_comments():
                 self.sc.create_story_comment(
                     story["id"],
-                    author=self.config["github_shortcut_user_map"][c.user.login],
+                    author=self._map_username(c.user.login),
                     created_at=c.created_at,
                     text=c.body,
                 )
