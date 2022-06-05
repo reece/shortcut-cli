@@ -1,0 +1,49 @@
+requests_cache_filename: migration-request-cache
+requests_cache_ttl: 432000 # 5 days
+migrated_filename: migrations
+
+github:
+  org: your-org-or-username
+  # token from https://github.com/settings/tokens
+  token: your-token
+  repos:
+    - repo-name # (without org)
+
+zenhub:
+  # token from https://app.zenhub.com/settings/tokens
+  url: https://api.zenhub.com/
+  token: looks-like-08f39c5de24f471696e4d06b5c653da98455bfd067133a5a7bba5114ff418f5c3d7bef9c14490b2d
+
+shortcut:
+  token: looks-like-f72a9337-2ce9-42dc-be36-105068c20074
+
+  groups:
+    engineering:
+      description:
+    lab:
+      description:
+    clinical:
+      description:
+
+  projects:
+    Infrastructure:
+      description:
+    Pipeline:
+      description:
+    Lab:
+      description:
+
+
+github_shortcut_user_map:
+  github-userreece: short-cut-uuid
+
+github_shortcut_issue_state_map:
+  closed: Completed
+  open: Unscheduled
+
+github_shortcut_epic_state_map:
+  closed: done
+  open: to do
+
+github_shortcut_repo_project_map:
+  github-repo-name: shortcut-project-name

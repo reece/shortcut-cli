@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+github-to-shortcut
+archive
+notes.txt
+config.yaml
