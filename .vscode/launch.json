@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
-            "justMyCode": false,
+            "justMyCode": true,
             "module": "shortcut_importer.__main__"
         }
     ]
