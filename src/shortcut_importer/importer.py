@@ -5,9 +5,11 @@ import logging
 import os
 import shelve
 
-from .services.githubzenhub import GitHubZenHub
-from .services.shortcut import EasyShortcut
+from github import Github
 import yaml
+
+#from .services.githubzenhub import GitHubZenHub
+from .services.shortcut import EasyShortcut
 
 _logger = logging.getLogger(__name__)
 
@@ -16,7 +18,7 @@ class Importer:
     def __init__(self, config):
         self.config = config
         self.github_org = self.config["github"]["org"]
-        self.gz = GitHubZenHub(github_config=config["github"], zenhub_config=config["zenhub"])
+        self._github = Github(config["github"]["token"])
         self.sc = EasyShortcut(token=config["shortcut"]["token"])
         self.migrated = shelve.open(config["migrated_filename"])
         self.strict = True
@@ -31,7 +33,9 @@ class Importer:
                 return None
 
     def migrate_repo(self, repo_name):
-        for issue in self.gz.fetch_issues(self.github_org, repo_name):
+        org = self._github.get_organization(self.github_org)
+        repo = org.get_repo(repo_name)
+        for issue in repo.get_issues(state="all", sort="created", direction="asc"):
             issue_abbr = f"{issue.repository.organization.login}/{repo_name}#{issue.number}"
             is_epic = any(l for l in issue.labels if l.name == "Epic")
             if issue.html_url in self.migrated:
