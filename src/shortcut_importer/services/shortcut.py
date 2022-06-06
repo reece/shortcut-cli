@@ -18,18 +18,24 @@ class Shortcut:
 
     def get(self, path):
         url = self.base_url + "/" + path
-        resp = self.session.get(url=url)
-        resp.raise_for_status()
+        try:
+            resp = self.session.get(url=url)
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            e.args = (e.args[0], resp.json()["message"])
+            raise(e)
         return resp.json()
 
     def post(self, path, data):
         url = self.base_url + "/" + path
-        resp = self.session.post(url=url, json=data)
-        _logger.debug(url + str(data))
-        resp.raise_for_status()
+        try:
+            resp = self.session.post(url=url, json=data)
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            e.args = (e.args[0], resp.json()["message"])
+            raise(e)
         return resp.json()
-
-
+            
 class EasyShortcut(Shortcut):
     def __init__(self, token):
         super().__init__(token)
@@ -68,7 +74,6 @@ class EasyShortcut(Shortcut):
         self.member_id_map = {
             m["profile"]["mention_name"]: m["id"]
             for m in self.get("members")
-            if not m["disabled"]
         }
 
         # eg {'backend': 394, 'frontend': 393, 'high priority': 395, 'low priority': 396}
@@ -88,24 +93,27 @@ class EasyShortcut(Shortcut):
 
     def _map_members(self, members: list):
         """map list of members to list of member_ids"""
-        return [self.member_id_map[m] for m in members]
+        return [self.member_id_map.get(m) for m in members]
 
     def create_epic(
         self,
         name: str,
         description: str,
         created_at: datetime.datetime = None,
-        epic_state: str = None,
+        state: str = None,
         owners: list = None,
+        requested_by: str = None,
         **kwargs,
     ) -> dict:
 
+        owner_ids = list(filter(None, self._map_members(owners)) if owners else [])
         body = dict(
             name=name,
             description=description,
             created_at=created_at.strftime("%FT%TZ"),
-            epic_state_id=self.epic_state_id_map[epic_state] if epic_state else None,
-            owner_ids=self._map_members(owners) if owners else None,
+            epic_state_id=self.epic_state_id_map[state] if state else None,
+            owner_ids=owner_ids,
+            requested_by_id=self.member_id_map.get(requested_by),
             **kwargs,
         )
         body = {k: v for k, v in body.items() if v is not None}
@@ -122,7 +130,7 @@ class EasyShortcut(Shortcut):
         body = dict(
             text=text,
             created_at=created_at.strftime("%FT%TZ") if created_at else None,
-            author_id=self.member_id_map[author] if author else None,
+            author_id=self.member_id_map.get(author) if author else None,
             **kwargs,
         )
         body = {k: v for k, v in body.items() if v is not None}
@@ -135,15 +143,18 @@ class EasyShortcut(Shortcut):
         created_at: datetime.datetime = None,
         state: str = None,
         owners: list = None,
+        requested_by: str = None,
         **kwargs,
     ) -> dict:
 
+        owner_ids = list(filter(None, self._map_members(owners)) if owners else [])
         body = dict(
             name=name,
             description=description,
             created_at=created_at.strftime("%FT%TZ"),
             workflow_state_id=self.issue_state_id_map[state] if state else None,
-            owner_ids=self._map_members(owners) if owners else None,
+            owner_ids=owner_ids,
+            requested_by_id=self.member_id_map.get(requested_by),
             **kwargs,
         )
         body = {k: v for k, v in body.items() if v is not None}
@@ -160,7 +171,7 @@ class EasyShortcut(Shortcut):
         body = dict(
             text=text,
             created_at=created_at.strftime("%FT%TZ") if created_at else None,
-            author_id=self.member_id_map[author] if author else None,
+            author_id=self.member_id_map.get(author) if author else None,
             **kwargs,
         )
         body = {k: v for k, v in body.items() if v is not None}

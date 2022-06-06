@@ -29,42 +29,22 @@ class Importer:
             if not self.strict:
                 _logger.warning("GitHub user %s is unmapped" % (github_username,))
                 return None
-            raise
 
     def migrate_repo(self, repo_name):
         for issue in self.gz.fetch_issues(self.github_org, repo_name):
             issue_abbr = f"{issue.repository.organization.login}/{repo_name}#{issue.number}"
             is_epic = any(l for l in issue.labels if l.name == "Epic")
-            if issue.user.login == "reece":
-                continue
             if issue.html_url in self.migrated:
                 _logger.debug("Skipping %s; already migrated to %s" % (issue.html_url, self.migrated[issue.html_url]))
                 continue
             sc_issue = self.migrate_issue(issue)
             self.migrated[issue.html_url] = sc_issue["id"]
-            if True:
-                _logger.info(f"TESTING: {issue_abbr}: Migrating only one issue/epic")
-                break  # testing: migrate only one issue in this repo
+            _logger.info("%s → %s" % (issue_abbr, sc_issue["app_url"]))
+
 
     def migrate_issue(self, issue):
         repo_name = issue.repository.name  # better: i.r.full_name
         is_epic = any(l for l in issue.labels if l.name == "Epic")
-        _logger.info(
-            "Migrating %s/%s#%s; %s w/%s comments: %s)"
-            % (
-                self.github_org,
-                repo_name,
-                issue.number,
-                "Epic" if is_epic else "Story",
-                issue.comments,
-                issue.title,
-            )
-        )
-        
-        # todo: repo -> project
-        # todo: closed_at?
-        # todo: closed_by?
-        
         original_comment = f"Migrated from GitHub [{self.github_org}/{repo_name}#{issue.number}]({issue.html_url})"
         body = dict(
             name=issue.title,
