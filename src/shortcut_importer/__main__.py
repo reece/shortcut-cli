@@ -41,3 +41,7 @@ impr = Importer(config)
 
 for repo_name in config["github"]["repos"]:
     impr.migrate_repo(repo_name=repo_name)
+    
+for repo_name in config["github"]["repos"]:
+    impr.connect_epics_from_zenhub(repo_name)
+    
