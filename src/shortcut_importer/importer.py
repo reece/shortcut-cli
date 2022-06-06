@@ -5,7 +5,9 @@ import logging
 import os
 import shelve
 
-from github import Github
+from github import Github, Issue, Repository
+import github
+import jmespath
 from zenhub import Zenhub
 import yaml
 
@@ -15,6 +17,10 @@ _logger = logging.getLogger(__name__)
 
 
 class Importer:
+    """Imports issues into Shortcut from GitHub, optionally with ZenHub data
+    """
+    estimate_p = jmespath.compile("estimate.value")
+    
     def __init__(self, config):
         self.config = config
         self.github_org = self.config["github"]["org"]
@@ -25,6 +31,7 @@ class Importer:
         migrated_fn = "{}-{}".format(config["migrated_filename"], config["shortcut"]["workspace"])
         self.migrated = shelve.open(migrated_fn)
         self.strict = True
+        self.allow_duplicates = True
 
     @functools.lru_cache(maxsize=1000)
     def _map_username(self, github_username):
@@ -59,10 +66,15 @@ class Importer:
                     % (child_public_id, child_key, parent_public_id, parent_key)
                 )
 
-    def migrate_issue(self, issue):
+    def migrate_issue(self, issue: Issue):
         repo_name = issue.repository.name  # better: i.r.full_name
         is_epic = any(l for l in issue.labels if l.name == "Epic")
         original_comment = f"Migrated from GitHub [{self.github_org}/{repo_name}#{issue.number}]({issue.html_url})"
+
+        issue_key = str((issue.repository.id, issue.number))
+        if issue_key in self.migrated and not(self.allow_duplicates):
+            _logger.info("Skipping %s; already migrated to %s" % (issue.html_url, self.migrated[issue_key]))
+            return None
 
         # prepare elements common to shortcut epics and issues
         body = dict(
@@ -84,10 +96,13 @@ class Importer:
                     created_at=c.created_at,
                     text=c.body,
                 )
-            return epic
+            sc_issue = epic
 
         else:  # Story
             body["state"] = self.config["github_shortcut_issue_state_map"][issue.state]
+            if self._zenhub:
+                issue_data = self._zenhub.get_issue_data(issue.repository.id, issue.number)
+                body["estimate"] = self.estimate_p.search(issue_data)
             story = self._shortcut.create_story(**body)
             for c in issue.get_comments():
                 self._shortcut.create_story_comment(
@@ -96,17 +111,16 @@ class Importer:
                     created_at=c.created_at,
                     text=c.body,
                 )
-            return story
+            sc_issue = story
+        
+        self.migrated[issue_key] = sc_issue["id"]
+        return sc_issue
 
     def migrate_repo(self, repo_name):
         org = self._github.get_organization(self.github_org)
         repo = org.get_repo(repo_name)
         for issue in repo.get_issues(state="all", sort="created", direction="asc"):
-            issue_key = str((repo.id, issue.number))
             issue_abbr = f"{issue.repository.organization.login}/{repo_name}#{issue.number}"
-            if issue_key in self.migrated:
-                _logger.debug("Skipping %s; already migrated to %s" % (issue.html_url, self.migrated[issue_key]))
-                continue
             sc_issue = self.migrate_issue(issue)
-            self.migrated[issue_key] = sc_issue["id"]
-            _logger.info("%s → %s" % (issue_abbr, sc_issue["app_url"]))
+            if sc_issue:
+                _logger.info("%s → %s" % (issue_abbr, sc_issue["app_url"]))

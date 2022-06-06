@@ -10,7 +10,8 @@
             "request": "launch",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "module": "shortcut_importer.__main__"
+            "module": "shortcut_importer.__main__",
+            "args": ["--issue", "myome/lims#240", "--issue", "myome/lims#307"]
         }
     ]
 }
