@@ -33,6 +33,8 @@ class Shortcut:
     @ratelimit.limits(calls=25, period=10)
     def post(self, path, data):
         url = self.base_url + "/" + path
+        # The SC API seems to not like null value bodies
+        data = {k: v for k, v in data.items() if v is not None}
         try:
             resp = self.session.post(url=url, json=data)
             resp.raise_for_status()
@@ -64,20 +66,40 @@ class EasyShortcut(Shortcut):
         Args:
             config (dict): _description_
         """
-        for group_name, group_info in config["groups"].items():
+        # groups
+        # milestones
+        # labels
+        
+        groups = [g["mention_name"] for g in self.get("groups")]
+        for group_info in config["groups"]:
+            mention_name = group_info["name"].lower().replace(" ", "")
+            if mention_name in groups:
+                continue
             body = dict(
-                name=group_name,
-                mention_name=group_name,
-                description=group_info["description"],
+                name=group_info["name"],
+                mention_name=mention_name,
+                description=group_info.get("description"),
+                workflows_ids=[self.default_workflow_id],
             )
-            self.post("groups", body)
+            resp = self.post("groups", body)
+            _logger.info("Created group %" % (mention_name,))
+
+        # self._refresh_metadata()
 
     def _refresh_metadata(self):
+        custom_fields = self.get("custom-fields")
+        
         # eg {'unstarted': 500000002, 'started': 500000003, 'done': 500000004}
         workflows = self.get("workflows")
         assert (
             len(workflows) == 1
         ), "This workspace has multiple workflows but I can handle exactly one"
+        self.default_workflow_id = workflows[0]["id"]
+
+        self.workflow_id_map = {
+            wf["name"]: wf["id"] for wf in workflows
+        }
+
         self.issue_state_id_map = {
             wfs["name"]: wfs["id"] for wfs in workflows[0]["states"]
         }
@@ -133,7 +155,6 @@ class EasyShortcut(Shortcut):
             requested_by_id=self.member_id_map.get(requested_by),
             **kwargs,
         )
-        body = {k: v for k, v in body.items() if v is not None}
         return self.post("epics", body)
 
     def create_epic_comment(
@@ -150,7 +171,6 @@ class EasyShortcut(Shortcut):
             author_id=self.member_id_map.get(author) if author else None,
             **kwargs,
         )
-        body = {k: v for k, v in body.items() if v is not None}
         return self.post(f"epics/{epic_public_id}/comments", body)
 
     def create_story(
@@ -174,7 +194,6 @@ class EasyShortcut(Shortcut):
             requested_by_id=self.member_id_map.get(requested_by),
             **kwargs,
         )
-        body = {k: v for k, v in body.items() if v is not None}
         return self.post("stories", body)
 
     def create_story_comment(
@@ -191,7 +210,6 @@ class EasyShortcut(Shortcut):
             author_id=self.member_id_map.get(author) if author else None,
             **kwargs,
         )
-        body = {k: v for k, v in body.items() if v is not None}
         return self.post(f"stories/{id}/comments", body)
 
 

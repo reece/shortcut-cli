@@ -26,6 +26,7 @@ def parse_args():
     ap.add_argument("--config", "-c", default="config.yaml")
     ap.add_argument("--issues", "-i", action="append", default=[])
     ap.add_argument("--repos", "-r", action="append", default=[])
+    ap.add_argument("--init", default=False, action="store_true")
     ap.add_argument("--import-repos", "-I", default=False, action="store_true")
     ap.add_argument("--zenhub-epics", "-z", default=False, action="store_true")
     # ap.add_argument("--allow-duplicates", "-D", default=False, action="store_true")
@@ -61,7 +62,10 @@ def main():
     setup_requests_cache(config)
     impr = Importer(config)
 
-    if opts.issues:
+    if opts.init:
+        impr._shortcut._config_workspace(config["shortcut"])
+        
+    elif opts.issues:
         for issue_key in opts.issues:
             m = issue_re.match(issue_key)
             if not m:
@@ -74,11 +78,11 @@ def main():
                 _logger.info("%s → %s" % (issue_key, sc_issue["app_url"]))
             pass
     
-    if opts.import_repos:
+    elif opts.import_repos:
         for repo_name in opts.repos:
             impr.migrate_repo(repo_name=repo_name)
 
-    if opts.zenhub_epics:
+    elif opts.zenhub_epics:
         for repo_name in opts.repos:
             impr.connect_epics_from_zenhub(repo_name)
 
