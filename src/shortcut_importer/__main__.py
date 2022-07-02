@@ -32,8 +32,6 @@ def parse_args():
     # ap.add_argument("--allow-duplicates", "-D", default=False, action="store_true")
 
     opts = ap.parse_args()
-    if opts.repos and opts.issue:
-        raise RuntimeError("--issue and --repos are mutually exclusive")
     return opts
 
 
@@ -41,8 +39,7 @@ def setup_requests_cache(config):
     requests_cache.install_cache(
         config["requests_cache_filename"],
         backend="sqlite",
-        expire_after=config["requests_cache_ttl"],
-        urls_expire_after={"api.app.shortcut.com": requests_cache.DO_NOT_CACHE},
+        urls_expire_after={"api.app.shortcut.com": requests_cache.DO_NOT_CACHE, "*": 3600},
     )
     _logger.info(
         "Installed requests cache %s w/%d s TTL" % (config["requests_cache_filename"], config["requests_cache_ttl"])
@@ -59,12 +56,13 @@ def main():
     opts = parse_args()
     config = yaml.safe_load(open(opts.config))
     opts.repos = opts.repos or config["github"]["repos"]
+
     setup_requests_cache(config)
     impr = Importer(config)
 
     if opts.init:
         impr._shortcut._config_workspace(config["shortcut"])
-        
+
     elif opts.issues:
         for issue_key in opts.issues:
             m = issue_re.match(issue_key)
@@ -77,7 +75,7 @@ def main():
             if sc_issue:
                 _logger.info("%s → %s" % (issue_key, sc_issue["app_url"]))
             pass
-    
+
     elif opts.import_repos:
         for repo_name in opts.repos:
             impr.migrate_repo(repo_name=repo_name)
