@@ -11,7 +11,7 @@ import jmespath
 from zenhub import Zenhub
 import yaml
 
-from .services.shortcut import EasyShortcut
+from .shortcut import EasyShortcut
 
 _logger = logging.getLogger(__name__)
 
