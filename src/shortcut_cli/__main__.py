@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-"""shortcut_importer
+"""migrate github issues to shortcut stories
+
+includes support for:
+- zenhub epics
 
 """
 
 import argparse
-from ipaddress import ip_network
 import logging
 import re
 

@@ -1,15 +1,17 @@
-# Shortcut Importer
+# Shortcut CLI
 
-This repo contains source for importing GitHub issues into Shortcut.  There is optional support for ZenHub epic assignments.  Web requests to GitHub and ZenHub are cached in order to work-around API limits. Migrated issues/epics are persisted so that restarts effectively pickup from the last successful migration. (In the event of an error, it's possible that an issue is migrated incompletely, resulting in a near-duplicate on shortcut. You should manually delete the older issue.)
+This repo provides a command line client for the [Shortcut](https://shortcut.com/) [API](https://shortcut.com/api/rest/v3).
 
 **This code was written as a one-off for my own needs. You should spot-check your own migrations. Good luck.**
 
-## Features
+## Goals and Features
 
-- mapping github to shortcut users
-- post-process for zenhub to create epics
+- Configure Shortcut projects, teams/groups, technical areas via yaml config file
+- Migrate GitHub issues to Shortcut stories, with optional user mapping, team assignments (based on repo), and support for ZenHub Epics.
+- Rate limiting and web request caching to mitigate API limits.
+- Restartable migration in the event of errors.
 
-## Not supported
+## Not supported (yet)
 
 - labels
 - multiple workflows in shortcut (make these later)
