@@ -2,18 +2,18 @@
 
 import functools
 import logging
-import os
+import re
 import shelve
 
-from github import Github, Issue, Repository
-import github
+from github import Github, Issue
 import jmespath
 from zenhub import Zenhub
-import yaml
 
-from .shortcut import EasyShortcut
+from .shortcut import Shortcut
 
 _logger = logging.getLogger(__name__)
+
+skip_labels_re = re.compile("size::")
 
 
 class Importer:
@@ -27,7 +27,7 @@ class Importer:
         self._github = Github(config["github"]["token"])
         self._zenhub = Zenhub(config["zenhub"]["token"])
         shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
-        self._shortcut = EasyShortcut(token=shortcut_token)
+        self._shortcut = Shortcut(token=shortcut_token)
         migrated_fn = "{}-{}".format(config["migrated_filename"], config["shortcut"]["workspace"])
         self.migrated = shelve.open(migrated_fn)
         self.strict = True

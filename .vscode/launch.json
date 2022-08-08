@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: Issue Migrator",
             "type": "python",
             "request": "launch",
@@ -12,7 +20,22 @@
             "justMyCode": true,
             "module": "shortcut_importer.__main__",
             // "args": ["-I"],
-            "args": ["--issue", "myome/engineering#47"]
+            "args": [
+                "--issue",
+                "myome/engineering#47"
+            ]
+        },
+        {
+            "name": "Python: Debug CLI",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "module": "shortcut_cli.cli",
+            "args": [
+                "-C", "config.yaml", "-v", "-w", "reecetesting1", "import-from-github", "static-data"
+            ]
         }
+
     ]
 }

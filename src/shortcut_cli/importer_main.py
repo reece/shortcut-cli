@@ -12,7 +12,6 @@ import logging
 import re
 
 import coloredlogs
-import requests
 import requests_cache
 import yaml
 

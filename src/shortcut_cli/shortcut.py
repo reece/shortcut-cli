@@ -1,62 +1,24 @@
+"""Pythonic-ish interface to shortcut"""
+
 import datetime
 import logging
-import re
 
-import ratelimit
-import requests
+from .shortcut_client import ShortcutClient
 
 _logger = logging.getLogger(__name__)
 
 
-skip_labels_re = re.compile("size::")
+class Shortcut(ShortcutClient):
+    """Pythonic interface to Shortcut
+    """
 
-class Shortcut:
-    def __init__(self, token):
-        session = requests.Session()
-        session.headers = {"Shortcut-Token": token}
-        self.session = session
-        self.base_url = "https://api.app.shortcut.com/api/v3"
+    def __init__(self, token: str):
+        """_summary_
 
-    @ratelimit.sleep_and_retry
-    @ratelimit.limits(calls=25, period=10)
-    def get(self, path):
-        url = self.base_url + "/" + path
-        try:
-            resp = self.session.get(url=url)
-            resp.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            e.args = (e.args[0], resp.json()["message"])
-            raise(e)
-        return resp.json()
-
-    @ratelimit.sleep_and_retry
-    @ratelimit.limits(calls=25, period=10)
-    def post(self, path, data):
-        url = self.base_url + "/" + path
-        # The SC API seems to not like null value bodies
-        data = {k: v for k, v in data.items() if v is not None}
-        try:
-            resp = self.session.post(url=url, json=data)
-            resp.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            e.args = (e.args[0], resp.json()["message"])
-            raise(e)
-        return resp.json()
-            
-    @ratelimit.sleep_and_retry
-    @ratelimit.limits(calls=25, period=10)
-    def put(self, path, data):
-        url = self.base_url + "/" + path
-        try:
-            resp = self.session.put(url=url, json=data)
-            resp.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            e.args = (e.args[0], resp.json()["message"])
-            raise(e)
-        return resp.json()
-
-class EasyShortcut(Shortcut):
-    def __init__(self, token):
+    Args:
+        Args:
+            token (str): Shortcut API token
+        """
         super().__init__(token)
         self._refresh_metadata()
 
@@ -219,5 +181,5 @@ if __name__ == "__main__":
 
     coloredlogs.install(level="DEBUG")
     # Tip: export SHORTCUT_API_TOKEN=$(yq .shortcut.token config.yaml)
-    sc = EasyShortcut(token=os.environ["SHORTCUT_API_TOKEN"])
+    sc = Shortcut(token=os.environ["SHORTCUT_API_TOKEN"])
     print(sc.create_epic(name="foo", description="bar"))
