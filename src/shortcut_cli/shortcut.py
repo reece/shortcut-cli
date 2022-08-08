@@ -9,15 +9,14 @@ _logger = logging.getLogger(__name__)
 
 
 class Shortcut(ShortcutClient):
-    """Pythonic interface to Shortcut
-    """
+    """Pythonic interface to Shortcut"""
 
     def __init__(self, token: str):
         """_summary_
 
-    Args:
         Args:
-            token (str): Shortcut API token
+            Args:
+                token (str): Shortcut API token
         """
         super().__init__(token)
         self._refresh_metadata()
@@ -31,7 +30,7 @@ class Shortcut(ShortcutClient):
         # groups
         # milestones
         # labels
-        
+
         groups = [g["mention_name"] for g in self.get("groups")]
         for group_info in config["groups"]:
             mention_name = group_info["name"].lower().replace(" ", "")
@@ -50,37 +49,25 @@ class Shortcut(ShortcutClient):
 
     def _refresh_metadata(self):
         custom_fields = self.get("custom-fields")
-        
+
         # eg {'unstarted': 500000002, 'started': 500000003, 'done': 500000004}
         workflows = self.get("workflows")
-        assert (
-            len(workflows) == 1
-        ), "This workspace has multiple workflows but I can handle exactly one"
-        self.default_workflow_id = workflows[0]["id"]
+        if len(workflows) > 1:
+            _logger.warn("Multiple workflows found; using the first as the default")
+        self.default_workflow_id = None # workflows[0]["id"]
 
-        self.workflow_id_map = {
-            wf["name"]: wf["id"] for wf in workflows
-        }
+        self.workflow_id_map = {wf["name"]: wf["id"] for wf in workflows}
 
-        self.issue_state_id_map = {
-            wfs["name"]: wfs["id"] for wfs in workflows[0]["states"]
-        }
+        self.issue_state_id_map = {wfs["name"]: wfs["id"] for wfs in workflows[0]["states"]}
 
         # eg {'unstarted': 500000002, 'started': 500000003, 'done': 500000004}
-        self.epic_state_id_map = {
-            es["name"]: es["id"] for es in self.get("epic-workflow")["epic_states"]
-        }
+        self.epic_state_id_map = {es["name"]: es["id"] for es in self.get("epic-workflow")["epic_states"]}
 
         # eg {'reece': '5fc55794-...', 'kateim': '5fcd04f2...'}
-        self.member_id_map = {
-            m["profile"]["mention_name"]: m["id"]
-            for m in self.get("members")
-        }
+        self.member_id_map = {m["profile"]["mention_name"]: m["id"] for m in self.get("members")}
 
         # eg {'backend': 394, 'frontend': 393, 'high priority': 395, 'low priority': 396}
-        self.labels_id_map = {
-            lr["name"]: lr["id"] for lr in self.get("labels") if not lr["archived"]
-        }
+        self.labels_id_map = {lr["name"]: lr["id"] for lr in self.get("labels") if not lr["archived"]}
 
         _logger.info(
             "%d issue states, %d epic states, %d members, %d labels"
@@ -88,7 +75,7 @@ class Shortcut(ShortcutClient):
                 len(self.issue_state_id_map),
                 len(self.epic_state_id_map),
                 len(self.member_id_map),
-                len(self.labels_id_map)
+                len(self.labels_id_map),
             )
         )
 
@@ -174,6 +161,9 @@ class Shortcut(ShortcutClient):
         )
         return self.post(f"stories/{id}/comments", body)
 
+    def _story_find_by_external_link(self, external_link: str):
+        return self.get(path="external-link/stories", data={"external_link": external_link})
+
 
 if __name__ == "__main__":
     import os
@@ -182,4 +172,9 @@ if __name__ == "__main__":
     coloredlogs.install(level="DEBUG")
     # Tip: export SHORTCUT_API_TOKEN=$(yq .shortcut.token config.yaml)
     sc = Shortcut(token=os.environ["SHORTCUT_API_TOKEN"])
-    print(sc.create_epic(name="foo", description="bar"))
+
+    import IPython
+
+    IPython.embed()
+
+    # print(sc.create_epic(name="foo", description="bar"))

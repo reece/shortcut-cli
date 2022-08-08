@@ -22,10 +22,10 @@ class ShortcutClient:
 
     @ratelimit.sleep_and_retry
     @ratelimit.limits(calls=25, period=10)
-    def get(self, path):
+    def get(self, path, data=None):
         url = self.base_url + "/" + path
         try:
-            resp = self.session.get(url=url)
+            resp = self.session.get(url=url, json=data or {})
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
             e.args = (e.args[0], resp.json()["message"])

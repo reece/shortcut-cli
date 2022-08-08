@@ -20,6 +20,11 @@ This repo provides a command line client for the [Shortcut](https://shortcut.com
 
 There is no pip installation because users will likely need to modify the code.  Instead, follow the developer setup below.
 
+## Usage
+
+`shortcut -C config.yaml -v -w reecetesting1 import-from-github static-data`
+
+
 ## Developer Setup
 
 Setup like this:

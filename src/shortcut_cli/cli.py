@@ -43,6 +43,7 @@ def parse_args():
     ap = _create_arg_parser()
     opts = ap.parse_args()
     opts._config = safe_load(open(opts.config_file))
+    opts._config["shortcut"]["workspace"] = opts.workspace  # ugly! remove config workspace entirely
     return opts
    
 

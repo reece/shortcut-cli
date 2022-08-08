@@ -19,6 +19,7 @@ skip_labels_re = re.compile("size::")
 class Importer:
     """Imports issues into Shortcut from GitHub, optionally with ZenHub data
     """
+    
     estimate_p = jmespath.compile("estimate.value")
     
     def __init__(self, config):
@@ -31,7 +32,7 @@ class Importer:
         migrated_fn = "{}-{}".format(config["migrated_filename"], config["shortcut"]["workspace"])
         self.migrated = shelve.open(migrated_fn)
         self.strict = True
-        self.allow_duplicates = True
+        self.allow_duplicates = False
 
     @functools.lru_cache(maxsize=1000)
     def _map_username(self, github_username):
@@ -71,9 +72,17 @@ class Importer:
         is_epic = any(l for l in issue.labels if l.name == "Epic")
         original_comment = f"Migrated from GitHub [{self.github_org}/{repo_name}#{issue.number}]({issue.html_url})"
 
+        el_stories = self._shortcut._story_find_by_external_link(issue.html_url)
+        if el_stories:
+            story = el_stories[0]
+            _logger.info("[link] Skipping %s; already migrated to %s" % (issue.html_url, story["app_url"]))
+            return None
+
         issue_key = str((issue.repository.id, issue.number))
         if issue_key in self.migrated and not(self.allow_duplicates):
-            _logger.info("Skipping %s; already migrated to %s" % (issue.html_url, self.migrated[issue_key]))
+            _logger.info("[migrated] Skipping %s; already migrated to %s" % (issue.html_url, self.migrated[issue_key]))
+            sc_issue_id = self.migrated[issue_key]
+            self._shortcut.put(f"stories/{sc_issue_id}", {"external_links": [issue.html_url]})
             return None
 
         # prepare elements common to shortcut epics and issues
@@ -100,6 +109,7 @@ class Importer:
 
         else:  # Story
             body["state"] = self.config["github_shortcut_issue_state_map"][issue.state]
+            body["external_links"] = [body["external_id"]]
             if self._zenhub:
                 issue_data = self._zenhub.get_issue_data(issue.repository.id, issue.number)
                 body["estimate"] = self.estimate_p.search(issue_data)
