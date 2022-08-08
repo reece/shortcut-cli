@@ -10,6 +10,7 @@ from yaml import safe_load
 
 from . import __version__
 from .importer import Importer
+from .shortcut import Shortcut
 
 
 _logger = logging.getLogger(__name__)
@@ -36,6 +37,13 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     ap.set_defaults(func=import_github_issues)
     ap.add_argument("--zenhub", "-z", default=False, action="store_true", help="pull epic and estimate data from zenhub")
     ap.add_argument("repos", nargs=1, help="Repo name, like org/name")
+
+    # shell
+    ap = subparsers.add_parser(
+        "shell", help="Open IPython shell with shortcut initialized"
+    )
+    ap.set_defaults(func=shell)
+
 
     return top_p
 
@@ -68,6 +76,12 @@ def setup_requests_cache(config):
     
     return cache
 
+
+def shell(opts):
+    config = opts._config
+    shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
+    sc = Shortcut(token=shortcut_token)
+    import IPython; IPython.embed()
 
 def main():
     import coloredlogs

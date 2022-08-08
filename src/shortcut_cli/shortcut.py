@@ -54,7 +54,7 @@ class Shortcut(ShortcutClient):
         workflows = self.get("workflows")
         if len(workflows) > 1:
             _logger.warn("Multiple workflows found; using the first as the default")
-        self.default_workflow_id = None # workflows[0]["id"]
+        self.default_workflow_id = None  # workflows[0]["id"]
 
         self.workflow_id_map = {wf["name"]: wf["id"] for wf in workflows}
 
@@ -68,6 +68,18 @@ class Shortcut(ShortcutClient):
 
         # eg {'backend': 394, 'frontend': 393, 'high priority': 395, 'low priority': 396}
         self.labels_id_map = {lr["name"]: lr["id"] for lr in self.get("labels") if not lr["archived"]}
+
+        # custom fields and shortcuts
+        self.custom_field_map = {
+            cf["name"]: {
+                "id": cf["id"],
+                "name": cf["name"],
+                "value_id_map": {v["value"]: v["id"] for v in cf["values"]},
+            }
+            for cf in self.get(path="custom-fields")
+        }
+        self.technical_area = self.custom_field_map["Technical Area"]
+
 
         _logger.info(
             "%d issue states, %d epic states, %d members, %d labels"
