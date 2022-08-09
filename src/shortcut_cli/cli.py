@@ -35,17 +35,19 @@ def _create_arg_parser() -> argparse.ArgumentParser:
         "import-from-github", help="Import issues from GitHub, optionally with ZenHub information"
     )
     ap.set_defaults(func=import_github_issues)
-    ap.add_argument("--zenhub", "-z", default=False, action="store_true", help="pull epic and estimate data from zenhub")
+    ap.add_argument(
+        "--zenhub", "-z", default=False, action="store_true", help="pull epic and estimate data from zenhub"
+    )
+    ap.add_argument("--technical-area", "-t")
+    ap.add_argument("--starting-issue", "-s")
     ap.add_argument("repos", nargs=1, help="Repo name, like org/name")
 
     # shell
-    ap = subparsers.add_parser(
-        "shell", help="Open IPython shell with shortcut initialized"
-    )
+    ap = subparsers.add_parser("shell", help="Open IPython shell with shortcut initialized")
     ap.set_defaults(func=shell)
 
-
     return top_p
+
 
 def parse_args():
     ap = _create_arg_parser()
@@ -53,12 +55,13 @@ def parse_args():
     opts._config = safe_load(open(opts.config_file))
     opts._config["shortcut"]["workspace"] = opts.workspace  # ugly! remove config workspace entirely
     return opts
-   
+
 
 def import_github_issues(opts):
     impr = Importer(opts._config)
     for repo in opts.repos:
-        impr.migrate_repo(repo)
+        impr.migrate_repo(repo, technical_area=opts.technical_area, starting_issue=opts.starting_issue)
+
 
 def setup_requests_cache(config):
     requests_cache.install_cache(
@@ -73,7 +76,7 @@ def setup_requests_cache(config):
     cache = requests_cache.get_cache()
     if any(u for u in cache.urls if "shortcut" in u):
         raise RuntimeError("cache contains shortcut URLs which fails when using multiple workspaces")
-    
+
     return cache
 
 
@@ -81,10 +84,14 @@ def shell(opts):
     config = opts._config
     shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
     sc = Shortcut(token=shortcut_token)
-    import IPython; IPython.embed()
+    import IPython
+
+    IPython.embed()
+
 
 def main():
     import coloredlogs
+
     coloredlogs.install(level="INFO")
     opts = parse_args()
     setup_requests_cache(opts._config)

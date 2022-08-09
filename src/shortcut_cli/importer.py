@@ -7,6 +7,7 @@ import shelve
 
 from github import Github, Issue
 import jmespath
+import requests.exceptions
 from zenhub import Zenhub
 
 from .shortcut import Shortcut
@@ -17,11 +18,10 @@ skip_labels_re = re.compile("size::")
 
 
 class Importer:
-    """Imports issues into Shortcut from GitHub, optionally with ZenHub data
-    """
-    
+    """Imports issues into Shortcut from GitHub, optionally with ZenHub data"""
+
     estimate_p = jmespath.compile("estimate.value")
-    
+
     def __init__(self, config):
         self.config = config
         self.github_org = self.config["github"]["org"]
@@ -67,7 +67,7 @@ class Importer:
                     % (child_public_id, child_key, parent_public_id, parent_key)
                 )
 
-    def migrate_issue(self, issue: Issue):
+    def migrate_issue(self, issue: Issue, technical_area=None):
         repo_name = issue.repository.name  # better: i.r.full_name
         is_epic = any(l for l in issue.labels if l.name == "Epic")
         original_comment = f"Migrated from GitHub [{self.github_org}/{repo_name}#{issue.number}]({issue.html_url})"
@@ -79,10 +79,14 @@ class Importer:
             return None
 
         issue_key = str((issue.repository.id, issue.number))
-        if issue_key in self.migrated and not(self.allow_duplicates):
+        if issue_key in self.migrated and not (self.allow_duplicates):
             _logger.info("[migrated] Skipping %s; already migrated to %s" % (issue.html_url, self.migrated[issue_key]))
             sc_issue_id = self.migrated[issue_key]
-            self._shortcut.put(f"stories/{sc_issue_id}", {"external_links": [issue.html_url]})
+            try:
+                self._shortcut.put(f"stories/{sc_issue_id}", {"external_links": [issue.html_url]})
+            except requests.exceptions.HTTPError as e:
+                if "404" not in str(e):
+                    raise
             return None
 
         # prepare elements common to shortcut epics and issues
@@ -110,6 +114,14 @@ class Importer:
         else:  # Story
             body["state"] = self.config["github_shortcut_issue_state_map"][issue.state]
             body["external_links"] = [body["external_id"]]
+            if technical_area:
+                body["custom_fields"] = [
+                    {
+                        "field_id": self._shortcut.technical_area["id"],
+                        "value_id": self._shortcut.technical_area["value_id_map"][technical_area],
+                        "value": technical_area,
+                    }
+                ]
             if self._zenhub:
                 issue_data = self._zenhub.get_issue_data(issue.repository.id, issue.number)
                 body["estimate"] = self.estimate_p.search(issue_data)
@@ -122,15 +134,17 @@ class Importer:
                     text=c.body,
                 )
             sc_issue = story
-        
+
         self.migrated[issue_key] = sc_issue["id"]
         return sc_issue
 
-    def migrate_repo(self, repo_name):
+    def migrate_repo(self, repo_name, /, starting_issue=None, technical_area=None):
         org = self._github.get_organization(self.github_org)
         repo = org.get_repo(repo_name)
         for issue in repo.get_issues(state="all", sort="created", direction="asc"):
+            if starting_issue and int(issue.number) < int(starting_issue):
+                continue
             issue_abbr = f"{issue.repository.organization.login}/{repo_name}#{issue.number}"
-            sc_issue = self.migrate_issue(issue)
+            sc_issue = self.migrate_issue(issue, technical_area=technical_area)
             if sc_issue:
                 _logger.info("%s → %s" % (issue_abbr, sc_issue["app_url"]))
