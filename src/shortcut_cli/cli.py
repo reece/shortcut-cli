@@ -1,10 +1,9 @@
 """Command line interface to Shortcut"""
 
 import argparse
-from ipaddress import ip_network
 import logging
-from pprint import pprint
 
+import pendulum
 import requests_cache
 from yaml import safe_load
 
@@ -30,6 +29,21 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     subparsers = top_p.add_subparsers(title="commands", dest="_subcommands")
     subparsers.required = True
 
+    # create-iterations
+    ap = subparsers.add_parser("create-iterations", help="Create iterations")
+    ap.set_defaults(func=create_iterations)
+    ap.add_argument("--duration", "-d", default=10, help="duration of iteration")
+    ap.add_argument("--n-iterations", "-n", default=1, type=int, help="number of iterations to create")
+    ap.add_argument("--period", "-p", default=14, help="start every n days")
+    ap.add_argument(
+        "--start-date",
+        "-s",
+        required=True,
+        type=lambda x: pendulum.from_format(x, "YYYY-MM-DD").date(),
+        help="iteration start date",
+    )
+    ap.add_argument("--team-slug", "-t", required=True, help="Team slug (not name)")
+
     # import-from-github
     ap = subparsers.add_parser(
         "import-from-github", help="Import issues from GitHub, optionally with ZenHub information"
@@ -49,7 +63,7 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     return top_p
 
 
-def parse_args():
+def _parse_args():
     ap = _create_arg_parser()
     opts = ap.parse_args()
     opts._config = safe_load(open(opts.config_file))
@@ -57,13 +71,7 @@ def parse_args():
     return opts
 
 
-def import_github_issues(opts):
-    impr = Importer(opts._config)
-    for repo in opts.repos:
-        impr.migrate_repo(repo, technical_area=opts.technical_area, starting_issue=opts.starting_issue)
-
-
-def setup_requests_cache(config):
+def _setup_requests_cache(config):
     requests_cache.install_cache(
         config["requests_cache_filename"],
         backend="sqlite",
@@ -72,12 +80,33 @@ def setup_requests_cache(config):
     _logger.info(
         "Installed requests cache %s w/%d s TTL" % (config["requests_cache_filename"], config["requests_cache_ttl"])
     )
-
     cache = requests_cache.get_cache()
     if any(u for u in cache.urls if "shortcut" in u):
         raise RuntimeError("cache contains shortcut URLs which fails when using multiple workspaces")
-
     return cache
+
+
+## Subcommands
+def create_iterations(opts):
+    config = opts._config
+    shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
+    sc = Shortcut(token=shortcut_token)
+    assert opts.period > opts.duration > 0, "period must be greater than duration, both > 0"
+    it_start_date = opts.start_date
+    for i in range(opts.n_iterations):
+        resp = sc.create_iteration(
+            start_date=it_start_date,
+            end_date=it_start_date.add(days=opts.duration),
+            team_slug=opts.team_slug
+        )
+        _logger.info(f"Created iteration {resp['name']} ({resp['app_url']})")
+        it_start_date = it_start_date.add(days=opts.period)
+
+
+def import_github_issues(opts):
+    impr = Importer(opts._config)
+    for repo in opts.repos:
+        impr.migrate_repo(repo, technical_area=opts.technical_area, starting_issue=opts.starting_issue)
 
 
 def shell(opts):
@@ -93,8 +122,8 @@ def main():
     import coloredlogs
 
     coloredlogs.install(level="INFO")
-    opts = parse_args()
-    setup_requests_cache(opts._config)
+    opts = _parse_args()
+    _setup_requests_cache(opts._config)
     opts.func(opts)
 
 

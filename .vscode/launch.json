@@ -20,7 +20,7 @@
             "justMyCode": true,
             "module": "shortcut_cli.cli",
             "args": [
-                "-C", "config.yaml", "-v", "-w", "myome", "import-from-github", "static-data"
+                "-C", "config.yaml", "-w", "reecetesting1", "create-iterations", "-s", "2022-08-15", "-n", "3", "-t", "team-2"
             ]
         }
 

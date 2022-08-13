@@ -50,6 +50,10 @@ class Shortcut(ShortcutClient):
     def _refresh_metadata(self):
         custom_fields = self.get("custom-fields")
 
+        self.teams_map = {
+            e["mention_name"]: {"id": e["id"], "workflow_ids": [e["workflow_ids"]]} for e in self.get("groups")
+        }
+
         # eg {'unstarted': 500000002, 'started': 500000003, 'done': 500000004}
         workflows = self.get("workflows")
         if len(workflows) > 1:
@@ -79,7 +83,6 @@ class Shortcut(ShortcutClient):
             for cf in self.get(path="custom-fields")
         }
         self.technical_area = self.custom_field_map["Technical Area"]
-
 
         _logger.info(
             "%d issue states, %d epic states, %d members, %d labels"
@@ -133,6 +136,15 @@ class Shortcut(ShortcutClient):
             **kwargs,
         )
         return self.post(f"epics/{epic_public_id}/comments", body)
+
+    def create_iteration(self, start_date: datetime.date, end_date: datetime.date, name: str = None, team_slug=None):
+        body = {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "name": name or f"{start_date} — {end_date}",
+            "group_ids": [self.teams_map[team_slug]["id"]] if team_slug else []
+        }
+        return self.post("iterations", body)
 
     def create_story(
         self,

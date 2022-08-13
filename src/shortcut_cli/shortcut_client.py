@@ -1,7 +1,7 @@
 """Shortcut API Client
 
-This module provides a thin wrapper for the Shortcut REST API, and primarily
-ratelimiting and caching. 
+This module provides a thin wrapper for the Shortcut REST API, primarily to
+support ratelimiting required by their API.
 
 """
 
@@ -36,7 +36,7 @@ class ShortcutClient:
     @ratelimit.limits(calls=25, period=10)
     def post(self, path, data):
         url = self.base_url + "/" + path
-        # The SC API seems to not like null value bodies
+        # The SC API chokes on keys w/ null values; remove them
         data = {k: v for k, v in data.items() if v is not None}
         try:
             resp = self.session.post(url=url, json=data)
