@@ -44,7 +44,10 @@ class Importer:
                 return None
 
     def connect_epics_from_zenhub(self, repo_name):
-        """connect epics in given repo to child issues, which must have been already migrated"""
+        """Connect already-migrated issues to epics from the specified repo
+        
+        """
+        
         org = self._github.get_organization(self.github_org)
         repo = org.get_repo(repo_name)
         epics = self._zenhub.get_epics(repo.id)["epic_issues"]

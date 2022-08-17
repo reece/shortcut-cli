@@ -20,7 +20,7 @@
             "justMyCode": true,
             "module": "shortcut_cli.cli",
             "args": [
-                "-C", "config.yaml", "-w", "reecetesting1", "create-iterations", "-s", "2022-08-15", "-n", "3", "-t", "team-2"
+                "-C", "config.yaml", "-w", "myome", "connect-zenhub-epics", "-z", "nf_pgx"
             ]
         }
 

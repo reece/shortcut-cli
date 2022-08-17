@@ -44,6 +44,16 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--team-slug", "-t", required=True, help="Team slug (not name)")
 
+    # connect-zenhub-epics
+    ap = subparsers.add_parser(
+        "connect-zenhub-epics", help="Connect issues that have already been migrated"
+    )
+    ap.set_defaults(func=connect_zenhub_epics)
+    ap.add_argument(
+        "--zenhub", "-z", default=False, action="store_true", help="pull epic and estimate data from zenhub"
+    )
+    ap.add_argument("repos", nargs=1, help="Repo name")
+
     # import-from-github
     ap = subparsers.add_parser(
         "import-from-github", help="Import issues from GitHub, optionally with ZenHub information"
@@ -54,7 +64,7 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--technical-area", "-t")
     ap.add_argument("--starting-issue", "-s")
-    ap.add_argument("repos", nargs=1, help="Repo name, like org/name")
+    ap.add_argument("repos", nargs=1, help="Repo name")
 
     # shell
     ap = subparsers.add_parser("shell", help="Open IPython shell with shortcut initialized")
@@ -107,6 +117,11 @@ def import_github_issues(opts):
     impr = Importer(opts._config)
     for repo in opts.repos:
         impr.migrate_repo(repo, technical_area=opts.technical_area, starting_issue=opts.starting_issue)
+
+def connect_zenhub_epics(opts):
+    impr = Importer(opts._config)
+    for repo in opts.repos:
+        impr.connect_epics_from_zenhub(repo)
 
 
 def shell(opts):
