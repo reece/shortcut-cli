@@ -1,6 +1,7 @@
 """Command line interface to Shortcut"""
 
 import argparse
+import functools
 import logging
 
 import pendulum
@@ -19,7 +20,7 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     top_p = argparse.ArgumentParser(
         description=__doc__.split("\n\n")[0],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        epilog="seqrepo " + __version__ + ". See https://github.com/biocommons/biocommons.seqrepo for more information",
+        epilog="shortcut-cli " + __version__,
     )
     top_p.add_argument("--config-file", "-C", help="config file (yaml)", type=str, default="config.yaml")
     top_p.add_argument("--verbose", "-v", action="count", default=0, help="be verbose; multiple accepted")
@@ -64,6 +65,7 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--technical-area", "-t")
     ap.add_argument("--starting-issue", "-s")
+    ap.add_argument("--labels", "-l", default=[], action="append")
     ap.add_argument("repos", nargs=1, help="Repo name")
 
     # shell
@@ -78,6 +80,8 @@ def _parse_args():
     opts = ap.parse_args()
     opts._config = safe_load(open(opts.config_file))
     opts._config["shortcut"]["workspace"] = opts.workspace  # ugly! remove config workspace entirely
+    if getattr(opts, "labels", None):
+        opts.labels = functools.reduce(lambda l,r: l + r.split(","), opts.labels, [])    # split on , and flatten list
     return opts
 
 
@@ -115,8 +119,9 @@ def create_iterations(opts):
 
 def import_github_issues(opts):
     impr = Importer(opts._config)
+    _logger.info(f"Importing issues from {len(opts.repos)} repos with labels {opts.labels}")
     for repo in opts.repos:
-        impr.migrate_repo(repo, technical_area=opts.technical_area, starting_issue=opts.starting_issue)
+        impr.migrate_repo(repo, technical_area=opts.technical_area, starting_issue=opts.starting_issue, labels=opts.labels)
 
 def connect_zenhub_epics(opts):
     impr = Importer(opts._config)

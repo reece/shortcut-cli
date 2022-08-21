@@ -62,7 +62,8 @@ class Shortcut(ShortcutClient):
 
         self.workflow_id_map = {wf["name"]: wf["id"] for wf in workflows}
 
-        self.issue_state_id_map = {wfs["name"]: wfs["id"] for wfs in workflows[0]["states"]}
+        self.story_state_id_map = {wfs["name"]: wfs["id"] for wfs in workflows[0]["states"]}
+        self.issue_state_id_map = self.story_state_id_map  # backward compat; refactor
 
         # eg {'unstarted': 500000002, 'started': 500000003, 'done': 500000004}
         self.epic_state_id_map = {es["name"]: es["id"] for es in self.get("epic-workflow")["epic_states"]}
@@ -106,10 +107,15 @@ class Shortcut(ShortcutClient):
         state: str = None,
         owners: list = None,
         requested_by: str = None,
+        labels: list = [],
         **kwargs,
     ) -> dict:
 
         owner_ids = list(filter(None, self._map_members(owners)) if owners else [])
+        created_at = created_at or datetime.datetime.utcnow()
+        if labels:
+            labels = [{"name": l} for l in labels]
+        state = state or "to do"
         body = dict(
             name=name,
             description=description,
@@ -117,6 +123,7 @@ class Shortcut(ShortcutClient):
             epic_state_id=self.epic_state_id_map[state] if state else None,
             owner_ids=owner_ids,
             requested_by_id=self.member_id_map.get(requested_by),
+            labels=labels,
             **kwargs,
         )
         return self.post("epics", body)
@@ -154,10 +161,15 @@ class Shortcut(ShortcutClient):
         state: str = None,
         owners: list = None,
         requested_by: str = None,
+        labels: list = None,
         **kwargs,
     ) -> dict:
 
         owner_ids = list(filter(None, self._map_members(owners)) if owners else [])
+        created_at = created_at or datetime.datetime.utcnow()
+        if labels:
+            labels = [{"name": l} for l in labels]
+        state = state or "Unscheduled"
         body = dict(
             name=name,
             description=description,
@@ -165,6 +177,7 @@ class Shortcut(ShortcutClient):
             workflow_state_id=self.issue_state_id_map[state] if state else None,
             owner_ids=owner_ids,
             requested_by_id=self.member_id_map.get(requested_by),
+            labels=labels,
             **kwargs,
         )
         return self.post("stories", body)

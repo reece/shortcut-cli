@@ -64,13 +64,19 @@ class Importer:
                 if child_public_id is None:
                     _logger.warn("Child story %s has not been migrated for epic %s" % (child_key, parent_key))
                     continue
-                resp = self._shortcut.put(f"stories/{child_public_id}", {"epic_id": parent_public_id})
-                _logger.info(
-                    "Story %s [%s] is child of epic %s [%s]"
-                    % (child_public_id, child_key, parent_public_id, parent_key)
-                )
+                try:
+                    resp = self._shortcut.put(f"stories/{child_public_id}", {"epic_id": parent_public_id})
+                    _logger.info(
+                        "Story %s [%s] is child of epic %s [%s]"
+                        % (child_public_id, child_key, parent_public_id, parent_key)
+                    )
+                except requests.exceptions.HTTPError:
+                    _logger.info(
+                        "Story %s [%s] was child of epic %s [%s], but no longer exists (probably deleted)"
+                        % (child_public_id, child_key, parent_public_id, parent_key)
+                    )
 
-    def migrate_issue(self, issue: Issue, technical_area=None):
+    def migrate_issue(self, issue: Issue, technical_area=None, labels=None):
         repo_name = issue.repository.name  # better: i.r.full_name
         is_epic = any(l for l in issue.labels if l.name == "Epic")
         original_comment = f"Migrated from GitHub [{self.github_org}/{repo_name}#{issue.number}]({issue.html_url})"
@@ -94,11 +100,12 @@ class Importer:
 
         # prepare elements common to shortcut epics and issues
         body = dict(
-            name=issue.title,
-            description=original_comment + "\n\n---\n\n" + (issue.body or ""),
             created_at=issue.created_at,
-            owners=list(filter(None, [self._map_username(a.login) for a in issue.assignees])),
+            description=original_comment + "\n\n---\n\n" + (issue.body or ""),
             external_id=issue.html_url,
+            labels=labels,
+            name=issue.title,
+            owners=list(filter(None, [self._map_username(a.login) for a in issue.assignees])),
             requested_by=self._map_username(issue.user.login),
         )
 
@@ -141,13 +148,20 @@ class Importer:
         self.migrated[issue_key] = sc_issue["id"]
         return sc_issue
 
-    def migrate_repo(self, repo_name, /, starting_issue=None, technical_area=None):
+    def migrate_repo(self, repo_name, /, starting_issue=None, technical_area=None, labels=None):
+        n_epics = n_stories = 0
         org = self._github.get_organization(self.github_org)
         repo = org.get_repo(repo_name)
         for issue in repo.get_issues(state="all", sort="created", direction="asc"):
+            is_epic = any(l for l in issue.labels if l.name == "Epic")
+            if is_epic:
+                n_epics += 1
+            else:
+                n_stories += 1
             if starting_issue and int(issue.number) < int(starting_issue):
                 continue
             issue_abbr = f"{issue.repository.organization.login}/{repo_name}#{issue.number}"
-            sc_issue = self.migrate_issue(issue, technical_area=technical_area)
+            sc_issue = self.migrate_issue(issue, technical_area=technical_area, labels=labels)
             if sc_issue:
                 _logger.info("%s → %s" % (issue_abbr, sc_issue["app_url"]))
+        _logger.info("%s: Migrated %s stories and %s epics" % (repo_name, n_stories, n_epics))

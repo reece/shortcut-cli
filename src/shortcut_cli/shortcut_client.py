@@ -1,7 +1,7 @@
 """Shortcut API Client
 
 This module provides a thin wrapper for the Shortcut REST API, primarily to
-support ratelimiting required by their API.
+support ratelimiting required by their API and to consolidate authentication.
 
 """
 
