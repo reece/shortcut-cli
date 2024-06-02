@@ -1,4 +1,7 @@
-"""Command line interface to Shortcut"""
+"""Command line interface to Shortcut
+
+
+"""
 
 import argparse
 import functools
@@ -26,14 +29,20 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     top_p.add_argument("--verbose", "-v", action="count", default=0, help="be verbose; multiple accepted")
     top_p.add_argument("--version", action="version", version=__version__)
     top_p.add_argument("--workspace", "-w", required=True)
+    top_p.add_argument("--dry-run", default=False, help="run queries but do not modify workspace")
 
     subparsers = top_p.add_subparsers(title="commands", dest="_subcommands")
     subparsers.required = True
 
+    # archive-epics
+    ap = subparsers.add_parser("archive-epics", help="Archive completed epics")
+    ap.set_defaults(func=archive_epics)
+    ap.add_argument("--age", "-a", default=90, type=int, help="Age in days of completed epics to archive")
+
     # create-iterations
     ap = subparsers.add_parser("create-iterations", help="Create iterations")
     ap.set_defaults(func=create_iterations)
-    ap.add_argument("--duration", "-d", default=10, help="duration of iteration")
+    ap.add_argument("--duration", "-d", default=10, type=int, help="duration of iteration")
     ap.add_argument("--n-iterations", "-n", default=1, type=int, help="number of iterations to create")
     ap.add_argument("--period", "-p", default=14, help="start every n days")
     ap.add_argument(
@@ -95,12 +104,31 @@ def _setup_requests_cache(config):
         "Installed requests cache %s w/%d s TTL" % (config["requests_cache_filename"], config["requests_cache_ttl"])
     )
     cache = requests_cache.get_cache()
-    if any(u for u in cache.urls if "shortcut" in u):
+    if any(u for u in cache.urls() if "shortcut" in u):
         raise RuntimeError("cache contains shortcut URLs which fails when using multiple workspaces")
     return cache
 
 
 ## Subcommands
+def archive_epics(opts):
+    config = opts._config
+    shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
+    sc = Shortcut(token=shortcut_token)
+    cutoff_timestamp = pendulum.now().subtract(days=opts.age)
+    epics_to_archive = []
+    for epic in sc.get_epics():
+        if epic["archived"]:
+            continue
+        updated_at = pendulum.parse(epic["updated_at"])
+        if updated_at < cutoff_timestamp:
+            epics_to_archive.append(epic)
+    epics_to_archive = epics_to_archive[:1]
+    _logger.info(f"Archiving {len(epics_to_archive)} epics")
+    for epic in epics_to_archive:
+        sc.put(f"epics/{epic['id']}", {"archived": True})
+        _logger.info(f"Archived {epic['id']} ({epic['name']})")
+
+
 def create_iterations(opts):
     config = opts._config
     shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
@@ -134,7 +162,6 @@ def shell(opts):
     shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
     sc = Shortcut(token=shortcut_token)
     import IPython
-
     IPython.embed()
 
 

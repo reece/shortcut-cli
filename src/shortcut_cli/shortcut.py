@@ -198,6 +198,9 @@ class Shortcut(ShortcutClient):
         )
         return self.post(f"stories/{id}/comments", body)
 
+    def get_epics(self):
+        return self.get("epics")
+        
     def _story_find_by_external_link(self, external_link: str):
         return self.get(path="external-link/stories", data={"external_link": external_link})
 

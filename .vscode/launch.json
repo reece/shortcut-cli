@@ -20,7 +20,7 @@
             "justMyCode": true,
             "module": "shortcut_cli.cli",
             "args": [
-                "-C", "config.yaml", "-w", "myome", "connect-zenhub-epics", "-z", "nf_pgx"
+                "-C", "config.yaml", "-w", "myome", "archive-epics", "--age", "400"
             ]
         }
 
