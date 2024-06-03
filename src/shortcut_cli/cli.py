@@ -29,7 +29,12 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     top_p.add_argument("--verbose", "-v", action="count", default=0, help="be verbose; multiple accepted")
     top_p.add_argument("--version", action="version", version=__version__)
     top_p.add_argument("--workspace", "-w", required=True)
-    top_p.add_argument("--dry-run", default=False, action=argparse.BooleanOptionalAction, help="run queries but do not modify workspace")
+    top_p.add_argument(
+        "--dry-run",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help="run queries but do not modify workspace",
+    )
 
     subparsers = top_p.add_subparsers(title="commands", dest="_subcommands")
     subparsers.required = True
@@ -38,6 +43,11 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     ap = subparsers.add_parser("archive-epics", help="Archive completed epics")
     ap.set_defaults(func=archive_epics)
     ap.add_argument("--age", "-a", default=90, type=int, help="Age in days of completed epics to archive")
+    ap.add_argument(
+        "--comment",
+        "-c",
+        help="Comment to add to epic before archiving",
+    )
     ap.add_argument("EPICS", nargs="*", help="Epics to unarchive")
 
     # create-iterations
@@ -56,9 +66,7 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--team-slug", "-t", required=True, help="Team slug (not name)")
 
     # connect-zenhub-epics
-    ap = subparsers.add_parser(
-        "connect-zenhub-epics", help="Connect issues that have already been migrated"
-    )
+    ap = subparsers.add_parser("connect-zenhub-epics", help="Connect issues that have already been migrated")
     ap.set_defaults(func=connect_zenhub_epics)
     ap.add_argument(
         "--zenhub", "-z", default=False, action="store_true", help="pull epic and estimate data from zenhub"
@@ -96,7 +104,7 @@ def _parse_args():
     opts._config = safe_load(open(opts.config_file))
     opts._config["shortcut"]["workspace"] = opts.workspace  # ugly! remove config workspace entirely
     if getattr(opts, "labels", None):
-        opts.labels = functools.reduce(lambda l,r: l + r.split(","), opts.labels, [])    # split on , and flatten list
+        opts.labels = functools.reduce(lambda l, r: l + r.split(","), opts.labels, [])  # split on , and flatten list
     return opts
 
 
@@ -137,8 +145,10 @@ def archive_epics(opts):
         _logger.info("(dry-run specified... not really archiving)")
     else:
         for epic_id in epics:
-            sc.put(f"epics/{epic_id}", {"archived": True})
-            _logger.info(f"Archived {epic_id} ({epics[epic_id]})")
+            if opts.comment:
+                sc.post(f"epics/{epic_id}/comments", {"text": opts.comment})
+            epic = sc.put(f"epics/{epic_id}", {"archived": True})
+            _logger.info(f"Archived {epic['id']} ({epic['name']})")
 
 
 def create_iterations(opts):
@@ -149,9 +159,7 @@ def create_iterations(opts):
     it_start_date = opts.start_date
     for i in range(opts.n_iterations):
         resp = sc.create_iteration(
-            start_date=it_start_date,
-            end_date=it_start_date.add(days=opts.duration),
-            team_slug=opts.team_slug
+            start_date=it_start_date, end_date=it_start_date.add(days=opts.duration), team_slug=opts.team_slug
         )
         _logger.info(f"Created iteration {resp['name']} ({resp['app_url']})")
         it_start_date = it_start_date.add(days=opts.period)
@@ -161,7 +169,10 @@ def import_github_issues(opts):
     impr = Importer(opts._config)
     _logger.info(f"Importing issues from {len(opts.repos)} repos with labels {opts.labels}")
     for repo in opts.repos:
-        impr.migrate_repo(repo, technical_area=opts.technical_area, starting_issue=opts.starting_issue, labels=opts.labels)
+        impr.migrate_repo(
+            repo, technical_area=opts.technical_area, starting_issue=opts.starting_issue, labels=opts.labels
+        )
+
 
 def connect_zenhub_epics(opts):
     impr = Importer(opts._config)
@@ -187,8 +198,8 @@ def unarchive_epics(opts):
         _logger.info("(dry-run specified... not really unarchiving)")
     else:
         for epic_id in epic_ids:
-            sc.put(f"epics/{epic_id}", {"archived": False})
-            _logger.info(f"Unarchived {epic_id}")
+            epic = sc.put(f"epics/{epic_id}", {"archived": False})
+            _logger.info(f"Unarchived {epic['id']} ({epic['name']})")
 
 
 def main():

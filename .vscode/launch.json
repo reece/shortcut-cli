@@ -20,7 +20,11 @@
             "justMyCode": true,
             "module": "shortcut_cli.cli",
             "args": [
-                "-C", "config.yaml", "-w", "myome", "archive-epics", "--age", "400"
+                "-C", "config.yaml",
+                "-w", "myome",
+                "archive-epics", 
+                "-c", "This epic is stale and has been archived. If you believe the epic is still relevant, reopen it.",
+                "1248"
             ]
         }
 
