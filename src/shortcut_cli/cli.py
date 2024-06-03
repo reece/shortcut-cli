@@ -38,6 +38,7 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     ap = subparsers.add_parser("archive-epics", help="Archive completed epics")
     ap.set_defaults(func=archive_epics)
     ap.add_argument("--age", "-a", default=90, type=int, help="Age in days of completed epics to archive")
+    ap.add_argument("EPICS", nargs="*", help="Epics to unarchive")
 
     # create-iterations
     ap = subparsers.add_parser("create-iterations", help="Create iterations")
@@ -120,20 +121,24 @@ def archive_epics(opts):
     shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
     sc = Shortcut(token=shortcut_token)
     cutoff_timestamp = pendulum.now().subtract(days=opts.age)
-    epics_to_archive = []
-    for epic in sc.get_epics():
-        if epic["archived"]:
-            continue
-        updated_at = pendulum.parse(epic["updated_at"])
-        if updated_at < cutoff_timestamp:
-            epics_to_archive.append(epic)
-    _logger.info(f"Archiving {len(epics_to_archive)} epics")
+    if len(opts.EPICS) > 0:
+        epics = {int(epic_id): None for epic_id in opts.EPICS}
+        _logger.info(f"Archiving {len(epics)} specified epics")
+    else:
+        epics = {}
+        for epic in sc.get_epics():
+            if epic["archived"]:
+                continue
+            updated_at = pendulum.parse(epic["updated_at"])
+            if updated_at < cutoff_timestamp:
+                epics[epic["id"]] = epic["name"]
+        _logger.info(f"Archiving {len(epics)} epics with age > {opts.age} days")
     if opts.dry_run:
         _logger.info("(dry-run specified... not really archiving)")
     else:
-        for epic in epics_to_archive:
-            sc.put(f"epics/{epic['id']}", {"archived": True})
-            _logger.info(f"Archived {epic['id']} ({epic['name']})")
+        for epic_id in epics:
+            sc.put(f"epics/{epic_id}", {"archived": True})
+            _logger.info(f"Archived {epic_id} ({epics[epic_id]})")
 
 
 def create_iterations(opts):
