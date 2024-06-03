@@ -33,7 +33,7 @@ def _create_arg_parser() -> argparse.ArgumentParser:
         "--dry-run",
         default=False,
         action=argparse.BooleanOptionalAction,
-        help="run queries but do not modify workspace",
+        help="Run queries but do not modify workspace",
     )
 
     subparsers = top_p.add_subparsers(title="commands", dest="_subcommands")
@@ -47,6 +47,13 @@ def _create_arg_parser() -> argparse.ArgumentParser:
         "--comment",
         "-c",
         help="Comment to add to epic before archiving",
+    )
+    ap.add_argument(
+        "--add-stale-comment",
+        "-s",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help="add staleness comment before archiving",
     )
     ap.add_argument("EPICS", nargs="*", help="Epics to unarchive")
 
@@ -137,16 +144,24 @@ def archive_epics(opts):
         for epic in sc.get_epics():
             if epic["archived"]:
                 continue
+            if epic["epic_state_id"] == sc.epic_state_id_map["Delivered"]:
+                continue
             updated_at = pendulum.parse(epic["updated_at"])
             if updated_at < cutoff_timestamp:
                 epics[epic["id"]] = epic["name"]
-        _logger.info(f"Archiving {len(epics)} epics with age > {opts.age} days")
+        epic_ids = [str(epic_id) for epic_id in epics.keys()]
+        _logger.info(f"Archiving {len(epics)} undelivered epics with age > {opts.age} days ({', '.join(epic_ids[:3])}, ...)")
     if opts.dry_run:
         _logger.info("(dry-run specified... not really archiving)")
     else:
         for epic_id in epics:
+            comment = None
             if opts.comment:
-                sc.post(f"epics/{epic_id}/comments", {"text": opts.comment})
+                comment = opts.comment
+            elif len(opts.EPICS) == 0 and opts.add_stale_comment:
+                comment = f"This epic has not been updated in {opts.age} days. It is stale and has been archived. If you believe the epic is still relevant, you may unarchive it."
+            if comment:
+                sc.post(f"epics/{epic_id}/comments", {"text": comment})
             epic = sc.put(f"epics/{epic_id}", {"archived": True})
             _logger.info(f"Archived {epic['id']} ({epic['name']})")
 
@@ -185,6 +200,7 @@ def shell(opts):
     shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
     sc = Shortcut(token=shortcut_token)
     import IPython
+
     IPython.embed()
 
 

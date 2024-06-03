@@ -20,11 +20,12 @@
             "justMyCode": true,
             "module": "shortcut_cli.cli",
             "args": [
+                "--dry-run",
                 "-C", "config.yaml",
                 "-w", "myome",
                 "archive-epics", 
-                "-c", "This epic is stale and has been archived. If you believe the epic is still relevant, reopen it.",
-                "1248"
+                "-s",
+                "--age", "180"
             ]
         }
 
