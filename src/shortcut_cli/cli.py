@@ -29,7 +29,7 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     top_p.add_argument("--verbose", "-v", action="count", default=0, help="be verbose; multiple accepted")
     top_p.add_argument("--version", action="version", version=__version__)
     top_p.add_argument("--workspace", "-w", required=True)
-    top_p.add_argument("--dry-run", default=False, help="run queries but do not modify workspace")
+    top_p.add_argument("--dry-run", default=False, action=argparse.BooleanOptionalAction, help="run queries but do not modify workspace")
 
     subparsers = top_p.add_subparsers(title="commands", dest="_subcommands")
     subparsers.required = True
@@ -81,6 +81,11 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     ap = subparsers.add_parser("shell", help="Open IPython shell with shortcut initialized")
     ap.set_defaults(func=shell)
 
+    # unarchive-epics
+    ap = subparsers.add_parser("unarchive-epics", help="Unarchive specified epics")
+    ap.set_defaults(func=unarchive_epics)
+    ap.add_argument("EPICS", nargs="+", help="Epics to unarchive")
+
     return top_p
 
 
@@ -122,11 +127,13 @@ def archive_epics(opts):
         updated_at = pendulum.parse(epic["updated_at"])
         if updated_at < cutoff_timestamp:
             epics_to_archive.append(epic)
-    epics_to_archive = epics_to_archive[:1]
     _logger.info(f"Archiving {len(epics_to_archive)} epics")
-    for epic in epics_to_archive:
-        sc.put(f"epics/{epic['id']}", {"archived": True})
-        _logger.info(f"Archived {epic['id']} ({epic['name']})")
+    if opts.dry_run:
+        _logger.info("(dry-run specified... not really archiving)")
+    else:
+        for epic in epics_to_archive:
+            sc.put(f"epics/{epic['id']}", {"archived": True})
+            _logger.info(f"Archived {epic['id']} ({epic['name']})")
 
 
 def create_iterations(opts):
@@ -163,6 +170,20 @@ def shell(opts):
     sc = Shortcut(token=shortcut_token)
     import IPython
     IPython.embed()
+
+
+def unarchive_epics(opts):
+    config = opts._config
+    shortcut_token = config["shortcut"]["tokens"][config["shortcut"]["workspace"]]
+    sc = Shortcut(token=shortcut_token)
+    epic_ids = opts.EPICS
+    _logger.info(f"Unarchiving {len(epic_ids)} epics")
+    if opts.dry_run:
+        _logger.info("(dry-run specified... not really unarchiving)")
+    else:
+        for epic_id in epic_ids:
+            sc.put(f"epics/{epic_id}", {"archived": False})
+            _logger.info(f"Unarchived {epic_id}")
 
 
 def main():

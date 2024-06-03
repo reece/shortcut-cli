@@ -3,12 +3,12 @@
 import datetime
 import logging
 
-from .shortcut_client import ShortcutClient
+from .api_client import APIClient
 
 _logger = logging.getLogger(__name__)
 
 
-class Shortcut(ShortcutClient):
+class Shortcut(APIClient):
     """Pythonic interface to Shortcut"""
 
     def __init__(self, token: str):

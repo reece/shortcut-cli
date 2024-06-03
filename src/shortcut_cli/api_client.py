@@ -13,7 +13,7 @@ import requests
 _logger = logging.getLogger(__name__)
 
 
-class ShortcutClient:
+class APIClient:
     def __init__(self, token):
         session = requests.Session()
         session.headers = {"Shortcut-Token": token}
